@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#09090f" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <title>Seeker Ascension</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="panel glow">
+      <h1>🜏 Seeker Ascension</h1>
+      <p class="subtitle">Rise from Sequence 9 to Sequence 0 through real-world trials.</p>
+      <div class="header-stats">
+        <div><span>Title</span><strong id="playerTitle">Initiate of Veils</strong></div>
+        <div><span>Sequence</span><strong id="playerSequence">9 — Initiate</strong></div>
+        <div><span>XP</span><strong id="playerXP">0</strong></div>
+      </div>
+      <div class="xp-bar-wrap">
+        <div class="xp-bar" id="xpBar"></div>
+      </div>
+    </header>
+
+    <section class="panel">
+      <h2>Download & Install</h2>
+      <p class="muted">Install on mobile as a standalone app for quick daily rituals and offline access.</p>
+      <button id="installBtn" class="hidden">Install App</button>
+      <p id="installStatus" class="muted">If install is unavailable, use browser menu → “Add to Home Screen”.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Avatar Forge</h2>
+      <div class="grid two">
+        <label>Name <input id="avatarName" type="text" placeholder="Seeker Name" /></label>
+        <label>Pathway
+          <select id="avatarPath">
+            <option>Warrior Path</option>
+            <option>Hunter Path</option>
+            <option>Mystic Path</option>
+            <option>Guardian Path</option>
+          </select>
+        </label>
+      </div>
+      <button id="saveAvatar">Seal Identity</button>
+      <p id="avatarSummary" class="muted"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Workout Ritual Log</h2>
+      <div class="grid two">
+        <label>Workout Type
+          <select id="workoutType">
+            <option value="walking">Walking</option>
+            <option value="stretching">Stretching</option>
+            <option value="pushups">Push-ups</option>
+            <option value="jogging">Jogging</option>
+            <option value="endurance">Endurance Circuit</option>
+            <option value="strength">Strength Training</option>
+            <option value="agility">Agility Drills</option>
+          </select>
+        </label>
+        <label>Amount / Reps / Minutes <input id="workoutAmount" type="number" min="1" value="20" /></label>
+      </div>
+      <label>Distance (km, for running/walking quests) <input id="workoutDistance" type="number" min="0" step="0.1" value="0" /></label>
+      <button id="logWorkout">Perform Ritual</button>
+      <ul id="workoutFeed" class="feed"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Quest Board</h2>
+      <ul id="dailyQuests" class="quest-list"></ul>
+      <h3>Weekly Boss Challenge</h3>
+      <div id="bossChallenge" class="boss"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Power Stats</h2>
+      <div class="stats-grid" id="statsGrid"></div>
+      <h3>Step Counter</h3>
+      <div class="grid two">
+        <label>Steps Today <input id="stepsInput" type="number" min="0" value="0" /></label>
+        <button id="addSteps">Channel Steps</button>
+      </div>
+      <p id="stepsSummary"></p>
+    </section>
+
+    <section class="panel">
+      <h2>Artifacts, Potions & Abilities</h2>
+      <ul id="inventory" class="feed"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Achievements</h2>
+      <ul id="achievements" class="feed"></ul>
+    </section>
+
+    <section class="panel">
+      <h2>Power Ranking Leaderboard</h2>
+      <ol id="leaderboard" class="leaderboard"></ol>
+    </section>
+
+    <section class="panel">
+      <h2>Sequence Progression Tree</h2>
+      <ol id="sequenceTree" class="tree"></ol>
+    </section>
+
+    <section class="panel">
+      <h2>Daily Blessing</h2>
+      <p id="loginReward"></p>
+      <p id="streak"></p>
+    </section>
+  </div>
+
+  <div id="levelUpOverlay" class="overlay hidden">
+    <div class="level-card">
+      <h2>⚡ Sequence Advancement! ⚡</h2>
+      <p id="levelText"></p>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
