@@ -1,3 +1,4 @@
+const http = require('node:http')
 const bedrock = require('bedrock-protocol')
 
 const config = {
@@ -14,6 +15,7 @@ let client
 let actionTimer
 let reconnectTimer
 let hasScheduledReconnect = false
+let keepAliveServer
 
 function log(message) {
   console.log(`[${new Date().toISOString()}] ${message}`)
@@ -30,34 +32,51 @@ function clearActionLoop() {
   }
 }
 
+function safeQueue(packetName, payload) {
+  if (!client) return false
+
+  try {
+    client.queue(packetName, payload)
+    return true
+  } catch (error) {
+    log(`Failed to send packet '${packetName}': ${error.message}`)
+    return false
+  }
+}
+
 function scheduleAction() {
   clearActionLoop()
+
   actionTimer = setTimeout(() => {
-    if (!client) return
+    if (!client) {
+      scheduleAction()
+      return
+    }
 
     const shouldJump = Math.random() > 0.5
+
     if (shouldJump) {
-      // Short jump pulse.
-      client.queue('player_action', {
+      const didStartJump = safeQueue('player_action', {
         action: 'start_jump',
         runtime_entity_id: client.entityId || 0,
-        position: { x: 0, y: 0, z: 0 },
+        position: client.position || { x: 0, y: 0, z: 0 },
         face: 1
       })
-      setTimeout(() => {
-        if (client) {
-          client.queue('player_action', {
+
+      if (didStartJump) {
+        setTimeout(() => {
+          safeQueue('player_action', {
             action: 'stop_jump',
             runtime_entity_id: client.entityId || 0,
-            position: { x: 0, y: 0, z: 0 },
+            position: client.position || { x: 0, y: 0, z: 0 },
             face: 1
           })
-        }
-      }, 250)
-      log('Anti-AFK action: jump')
+        }, 250)
+        log('Anti-AFK action: jump')
+      }
     } else {
       const yaw = Math.random() * 360
-      client.queue('move_player', {
+      const didRotate = safeQueue('move_player', {
         runtime_id: client.entityId || 0,
         position: client.position || { x: 0, y: 0, z: 0 },
         pitch: 0,
@@ -70,7 +89,10 @@ function scheduleAction() {
         teleport_source_entity_type: 0,
         tick: 0
       })
-      log(`Anti-AFK action: rotate to yaw ${yaw.toFixed(2)}`)
+
+      if (didRotate) {
+        log(`Anti-AFK action: rotate to yaw ${yaw.toFixed(2)}`)
+      }
     }
 
     scheduleAction()
@@ -137,12 +159,60 @@ function connect() {
   })
 }
 
-process.on('SIGINT', () => {
+function startOptionalKeepAliveServer() {
+  const portFromEnv = Number.parseInt(process.env.PORT || '', 10)
+  if (!portFromEnv) return
+
+  keepAliveServer = http.createServer((_, response) => {
+    response.writeHead(200, { 'content-type': 'text/plain' })
+    response.end('AFK bot is running\n')
+  })
+
+  keepAliveServer.listen(portFromEnv, '0.0.0.0', () => {
+    log(`Keep-alive HTTP server listening on 0.0.0.0:${portFromEnv}`)
+  })
+}
+
+function shutdown() {
   log('Shutting down bot...')
+
   clearActionLoop()
-  if (reconnectTimer) clearTimeout(reconnectTimer)
-  if (client) client.disconnect()
+
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer)
+    reconnectTimer = null
+  }
+
+  if (keepAliveServer) {
+    keepAliveServer.close()
+  }
+
+  if (client) {
+    try {
+      client.disconnect()
+    } catch (error) {
+      log(`Error while disconnecting client: ${error.message}`)
+    }
+  }
+}
+
+process.on('uncaughtException', error => {
+  log(`Uncaught exception: ${error.stack || error.message}`)
+})
+
+process.on('unhandledRejection', reason => {
+  log(`Unhandled rejection: ${String(reason)}`)
+})
+
+process.on('SIGINT', () => {
+  shutdown()
   process.exit(0)
 })
 
+process.on('SIGTERM', () => {
+  shutdown()
+  process.exit(0)
+})
+
+startOptionalKeepAliveServer()
 connect()

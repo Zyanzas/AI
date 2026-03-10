@@ -42,3 +42,9 @@ This repo includes `render.yaml` configured as a **Worker** service with:
 - `startCommand: npm start`
 
 You can deploy using Blueprint so Render picks up these settings automatically.
+
+
+## Render runtime behavior
+
+- Preferred: deploy as a **Worker** service (as configured in `render.yaml`).
+- Safety fallback: if Render injects a `PORT` env var (common for Web services), the bot now also starts a tiny HTTP server on `0.0.0.0:$PORT` so the process is not terminated for “no open HTTP ports detected”.
