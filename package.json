@@ -1,0 +1,19 @@
+{
+  "name": "bedrock-afk-bot",
+  "version": "1.0.0",
+  "description": "Simple Minecraft Bedrock AFK bot using bedrock-protocol",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "minecraft",
+    "bedrock",
+    "bot",
+    "afk"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "bedrock-protocol": "^3.41.5"
+  }
+}
