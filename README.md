@@ -30,3 +30,15 @@ npm start
 - Performs an anti-AFK action every **20–30 seconds**:
   - Jump pulse, or
   - Small rotate/update movement packet.
+
+## Render deployment note
+
+If Render reports `ENOENT: no such file or directory, open '/opt/render/project/src/package.json'`, make sure the service points at the repository root.
+
+This repo includes `render.yaml` configured as a **Worker** service with:
+
+- `rootDir: .`
+- `buildCommand: npm install`
+- `startCommand: npm start`
+
+You can deploy using Blueprint so Render picks up these settings automatically.
