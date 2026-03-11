@@ -44,6 +44,64 @@ function safeQueue(packetName, payload) {
   }
 }
 
+function pulsePlayerAction(startAction, stopAction, label) {
+  const didStart = safeQueue('player_action', {
+    action: startAction,
+    runtime_entity_id: client.entityId || 0,
+    position: client.position || { x: 0, y: 0, z: 0 },
+    face: 1
+  })
+
+  if (!didStart) return false
+
+  setTimeout(() => {
+    safeQueue('player_action', {
+      action: stopAction,
+      runtime_entity_id: client.entityId || 0,
+      position: client.position || { x: 0, y: 0, z: 0 },
+      face: 1
+    })
+  }, 250)
+
+  log(`Anti-AFK action: ${label}`)
+  return true
+}
+
+function rotateToRandomYaw(label = 'rotate') {
+  const yaw = Math.random() * 360
+  const didRotate = safeQueue('move_player', {
+    runtime_id: client.entityId || 0,
+    position: client.position || { x: 0, y: 0, z: 0 },
+    pitch: Math.random() * 20 - 10,
+    yaw,
+    head_yaw: yaw,
+    mode: 0,
+    on_ground: true,
+    ridden_runtime_id: 0,
+    teleport_cause: 0,
+    teleport_source_entity_type: 0,
+    tick: 0
+  })
+
+  if (didRotate) {
+    log(`Anti-AFK action: ${label} to yaw ${yaw.toFixed(2)}`)
+  }
+
+  return didRotate
+}
+
+function runRandomAntiAfkAction() {
+  const actions = [
+    () => pulsePlayerAction('start_jump', 'stop_jump', 'jump'),
+    () => pulsePlayerAction('start_sneaking', 'stop_sneaking', 'sneak'),
+    () => rotateToRandomYaw('rotate'),
+    () => rotateToRandomYaw('look around')
+  ]
+
+  const selectedAction = actions[Math.floor(Math.random() * actions.length)]
+  selectedAction()
+}
+
 function scheduleAction() {
   clearActionLoop()
 
@@ -53,48 +111,7 @@ function scheduleAction() {
       return
     }
 
-    const shouldJump = Math.random() > 0.5
-
-    if (shouldJump) {
-      const didStartJump = safeQueue('player_action', {
-        action: 'start_jump',
-        runtime_entity_id: client.entityId || 0,
-        position: client.position || { x: 0, y: 0, z: 0 },
-        face: 1
-      })
-
-      if (didStartJump) {
-        setTimeout(() => {
-          safeQueue('player_action', {
-            action: 'stop_jump',
-            runtime_entity_id: client.entityId || 0,
-            position: client.position || { x: 0, y: 0, z: 0 },
-            face: 1
-          })
-        }, 250)
-        log('Anti-AFK action: jump')
-      }
-    } else {
-      const yaw = Math.random() * 360
-      const didRotate = safeQueue('move_player', {
-        runtime_id: client.entityId || 0,
-        position: client.position || { x: 0, y: 0, z: 0 },
-        pitch: 0,
-        yaw,
-        head_yaw: yaw,
-        mode: 0,
-        on_ground: true,
-        ridden_runtime_id: 0,
-        teleport_cause: 0,
-        teleport_source_entity_type: 0,
-        tick: 0
-      })
-
-      if (didRotate) {
-        log(`Anti-AFK action: rotate to yaw ${yaw.toFixed(2)}`)
-      }
-    }
-
+    runRandomAntiAfkAction()
     scheduleAction()
   }, getRandomDelay())
 }

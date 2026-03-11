@@ -28,8 +28,9 @@ npm start
 - Logs connection/disconnection status to console.
 - Automatically reconnects 5 seconds after disconnect.
 - Performs an anti-AFK action every **20–30 seconds**:
-  - Jump pulse, or
-  - Small rotate/update movement packet.
+  - Jump pulse,
+  - Sneak pulse, or
+  - Rotate/look-around movement update.
 
 ## Render deployment note
 
