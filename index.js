@@ -4,7 +4,7 @@ const bedrock = require('bedrock-protocol')
 const config = {
   host: '157.180.106.62',
   port: 24001,
-  username: 'SPOOKY2'
+  username: 'AFKBot'
 }
 
 const MIN_ACTION_DELAY_MS = 20_000

@@ -8,7 +8,7 @@ This bot is preconfigured with:
 
 - **Server IP:** `157.180.106.62`
 - **Server Port:** `24001`
-- **Bot Username:** `SPOOKY2`
+- **Bot Username:** `AFKBot`
 
 ## Install dependencies
 
