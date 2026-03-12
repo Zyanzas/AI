@@ -8,7 +8,7 @@ This bot is preconfigured with:
 
 - **Server IP:** `157.180.106.62`
 - **Server Port:** `24001`
-- **Bot Username:** `AFKBot`
+- **Bot Username:** `SPOOKY2`
 
 ## Install dependencies
 
@@ -28,6 +28,7 @@ npm start
 - Logs connection/disconnection status to console.
 - Automatically reconnects 5 seconds after disconnect.
 - Moves like a player with frequent randomized walk steps every 0.7–1.5 seconds.
+- Jumps continuously every 1.5–3 seconds in addition to other actions.
 - Spams left click (arm swing) every 0.25–0.5 seconds to mimic active combat/input.
 - Performs an anti-AFK action every **20–30 seconds**:
   - Jump pulse,

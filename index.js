@@ -4,7 +4,7 @@ const bedrock = require('bedrock-protocol')
 const config = {
   host: '157.180.106.62',
   port: 24001,
-  username: 'AFKBot'
+  username: 'SPOOKY2'
 }
 
 const MIN_ACTION_DELAY_MS = 20_000
@@ -13,6 +13,8 @@ const MIN_MOVE_DELAY_MS = 700
 const MAX_MOVE_DELAY_MS = 1_500
 const MIN_CLICK_DELAY_MS = 250
 const MAX_CLICK_DELAY_MS = 500
+const MIN_JUMP_DELAY_MS = 1_500
+const MAX_JUMP_DELAY_MS = 3_000
 const RECONNECT_DELAY_MS = 5_000
 const WALK_STEP_MIN = 0.35
 const WALK_STEP_MAX = 0.9
@@ -21,6 +23,7 @@ let client
 let actionTimer
 let movementTimer
 let clickTimer
+let jumpTimer
 let reconnectTimer
 let hasScheduledReconnect = false
 let keepAliveServer
@@ -57,6 +60,13 @@ function clearClickLoop() {
   if (clickTimer) {
     clearTimeout(clickTimer)
     clickTimer = null
+  }
+}
+
+function clearJumpLoop() {
+  if (jumpTimer) {
+    clearTimeout(jumpTimer)
+    jumpTimer = null
   }
 }
 
@@ -266,6 +276,20 @@ function scheduleLeftClickSpam() {
   }, getRandomInt(MIN_CLICK_DELAY_MS, MAX_CLICK_DELAY_MS))
 }
 
+function scheduleJumpLoop() {
+  clearJumpLoop()
+
+  jumpTimer = setTimeout(() => {
+    if (!client) {
+      scheduleJumpLoop()
+      return
+    }
+
+    pulsePlayerAction('start_jump', 'stop_jump', 'jump')
+    scheduleJumpLoop()
+  }, getRandomInt(MIN_JUMP_DELAY_MS, MAX_JUMP_DELAY_MS))
+}
+
 function scheduleReconnect(reason) {
   if (hasScheduledReconnect) return
   hasScheduledReconnect = true
@@ -273,6 +297,7 @@ function scheduleReconnect(reason) {
   clearActionLoop()
   clearMovementLoop()
   clearClickLoop()
+  clearJumpLoop()
 
   log(`Disconnected (${reason}). Reconnecting in ${RECONNECT_DELAY_MS / 1000}s...`)
 
@@ -305,6 +330,7 @@ function connect() {
     scheduleMovement()
     scheduleAction()
     scheduleLeftClickSpam()
+    scheduleJumpLoop()
   })
 
   client.on('start_game', packet => {
@@ -360,6 +386,7 @@ function shutdown() {
   clearActionLoop()
   clearMovementLoop()
   clearClickLoop()
+  clearJumpLoop()
 
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
