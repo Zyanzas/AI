@@ -9,10 +9,15 @@ const config = {
 
 const MIN_ACTION_DELAY_MS = 20_000
 const MAX_ACTION_DELAY_MS = 30_000
+const MIN_MOVE_DELAY_MS = 2_000
+const MAX_MOVE_DELAY_MS = 5_000
 const RECONNECT_DELAY_MS = 5_000
+const WALK_STEP_MIN = 0.25
+const WALK_STEP_MAX = 0.7
 
 let client
 let actionTimer
+let movementTimer
 let reconnectTimer
 let hasScheduledReconnect = false
 let keepAliveServer
@@ -21,14 +26,25 @@ function log(message) {
   console.log(`[${new Date().toISOString()}] ${message}`)
 }
 
-function getRandomDelay() {
-  return Math.floor(Math.random() * (MAX_ACTION_DELAY_MS - MIN_ACTION_DELAY_MS + 1)) + MIN_ACTION_DELAY_MS
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min
+}
+
+function getRandomFloat(min, max) {
+  return Math.random() * (max - min) + min
 }
 
 function clearActionLoop() {
   if (actionTimer) {
     clearTimeout(actionTimer)
     actionTimer = null
+  }
+}
+
+function clearMovementLoop() {
+  if (movementTimer) {
+    clearTimeout(movementTimer)
+    movementTimer = null
   }
 }
 
@@ -63,16 +79,15 @@ function pulsePlayerAction(startAction, stopAction, label) {
     })
   }, 250)
 
-  log(`Anti-AFK action: ${label}`)
+  log(`Player action: ${label}`)
   return true
 }
 
-function rotateToRandomYaw(label = 'rotate') {
-  const yaw = Math.random() * 360
-  const didRotate = safeQueue('move_player', {
+function sendMovePacket(position, yaw, pitch = 0) {
+  return safeQueue('move_player', {
     runtime_id: client.entityId || 0,
-    position: client.position || { x: 0, y: 0, z: 0 },
-    pitch: Math.random() * 20 - 10,
+    position,
+    pitch,
     yaw,
     head_yaw: yaw,
     mode: 0,
@@ -82,23 +97,56 @@ function rotateToRandomYaw(label = 'rotate') {
     teleport_source_entity_type: 0,
     tick: 0
   })
+}
+
+function rotateToRandomYaw(label = 'look around') {
+  const yaw = getRandomFloat(0, 360)
+  const pitch = getRandomFloat(-12, 12)
+  const didRotate = sendMovePacket(client.position || { x: 0, y: 0, z: 0 }, yaw, pitch)
 
   if (didRotate) {
-    log(`Anti-AFK action: ${label} to yaw ${yaw.toFixed(2)}`)
+    client.yaw = yaw
+    log(`Player action: ${label} (yaw ${yaw.toFixed(1)})`)
   }
 
   return didRotate
+}
+
+function moveLikePlayer() {
+  if (!client || !client.position) return false
+
+  const currentYaw = Number.isFinite(client.yaw) ? client.yaw : getRandomFloat(0, 360)
+  const yawDelta = getRandomFloat(-55, 55)
+  const yaw = (currentYaw + yawDelta + 360) % 360
+  const radians = (yaw * Math.PI) / 180
+  const step = getRandomFloat(WALK_STEP_MIN, WALK_STEP_MAX)
+
+  const position = {
+    x: client.position.x + Math.cos(radians) * step,
+    y: client.position.y,
+    z: client.position.z + Math.sin(radians) * step
+  }
+
+  const didMove = sendMovePacket(position, yaw, getRandomFloat(-8, 8))
+
+  if (didMove) {
+    client.position = position
+    client.yaw = yaw
+    log(`Player action: walk step (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`)
+  }
+
+  return didMove
 }
 
 function runRandomAntiAfkAction() {
   const actions = [
     () => pulsePlayerAction('start_jump', 'stop_jump', 'jump'),
     () => pulsePlayerAction('start_sneaking', 'stop_sneaking', 'sneak'),
-    () => rotateToRandomYaw('rotate'),
-    () => rotateToRandomYaw('look around')
+    () => rotateToRandomYaw('rotate in place'),
+    () => moveLikePlayer()
   ]
 
-  const selectedAction = actions[Math.floor(Math.random() * actions.length)]
+  const selectedAction = actions[getRandomInt(0, actions.length - 1)]
   selectedAction()
 }
 
@@ -113,7 +161,26 @@ function scheduleAction() {
 
     runRandomAntiAfkAction()
     scheduleAction()
-  }, getRandomDelay())
+  }, getRandomInt(MIN_ACTION_DELAY_MS, MAX_ACTION_DELAY_MS))
+}
+
+function scheduleMovement() {
+  clearMovementLoop()
+
+  movementTimer = setTimeout(() => {
+    if (!client) {
+      scheduleMovement()
+      return
+    }
+
+    moveLikePlayer()
+
+    if (Math.random() < 0.2) {
+      rotateToRandomYaw('look around while walking')
+    }
+
+    scheduleMovement()
+  }, getRandomInt(MIN_MOVE_DELAY_MS, MAX_MOVE_DELAY_MS))
 }
 
 function scheduleReconnect(reason) {
@@ -121,6 +188,7 @@ function scheduleReconnect(reason) {
   hasScheduledReconnect = true
 
   clearActionLoop()
+  clearMovementLoop()
 
   log(`Disconnected (${reason}). Reconnecting in ${RECONNECT_DELAY_MS / 1000}s...`)
 
@@ -147,17 +215,21 @@ function connect() {
 
   client.on('join', () => {
     log('Connected and joined the server.')
+    scheduleMovement()
     scheduleAction()
   })
 
   client.on('start_game', packet => {
     client.entityId = packet.runtime_entity_id
     client.position = packet.player_position
+    client.yaw = packet.yaw || 0
+    log(`Spawned at (${client.position.x.toFixed(2)}, ${client.position.y.toFixed(2)}, ${client.position.z.toFixed(2)})`)
   })
 
   client.on('move_player', packet => {
     if (packet.runtime_id === client.entityId) {
       client.position = packet.position
+      client.yaw = packet.yaw
     }
   })
 
@@ -194,6 +266,7 @@ function shutdown() {
   log('Shutting down bot...')
 
   clearActionLoop()
+  clearMovementLoop()
 
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
