@@ -27,6 +27,7 @@ npm start
 - Connects to the Bedrock server.
 - Logs connection/disconnection status to console.
 - Automatically reconnects 5 seconds after disconnect.
+- Waits 8 seconds after join before starting movement/click loops for better join stability on strict servers.
 - Moves like a player with frequent randomized walk steps every 0.7–1.5 seconds.
 - Jumps continuously every 1.5–3 seconds in addition to other actions.
 - Spams left click (arm swing) every 0.25–0.5 seconds to mimic active combat/input.

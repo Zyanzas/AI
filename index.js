@@ -18,6 +18,7 @@ const MAX_JUMP_DELAY_MS = 3_000
 const RECONNECT_DELAY_MS = 5_000
 const WALK_STEP_MIN = 0.35
 const WALK_STEP_MAX = 0.9
+const STARTUP_GRACE_MS = 8_000
 
 let client
 let actionTimer
@@ -111,17 +112,11 @@ function sendLeftClick() {
     runtime_entity_id: client.entityId || 0
   })
 
-  const didInteract = safeQueue('interact', {
-    action_id: 'mouse_over_entity',
-    target_entity_id: 0,
-    position: client.position || { x: 0, y: 0, z: 0 }
-  })
-
-  if (didSwing || didInteract) {
+  if (didSwing) {
     log('Player action: left click')
   }
 
-  return didSwing || didInteract
+  return didSwing
 }
 
 function sendMovePacket(position, yaw, pitch = 0) {
@@ -324,13 +319,15 @@ function connect() {
 
   client.on('join', () => {
     log('Connected and joined the server.')
-    // Trigger immediate visible behavior, then continue scheduled loops.
-    moveLikePlayer()
-    sendLeftClick()
-    scheduleMovement()
-    scheduleAction()
-    scheduleLeftClickSpam()
-    scheduleJumpLoop()
+    log(`Waiting ${STARTUP_GRACE_MS / 1000}s before actions to avoid early disconnects...`)
+
+    setTimeout(() => {
+      if (!client) return
+      scheduleMovement()
+      scheduleAction()
+      scheduleLeftClickSpam()
+      scheduleJumpLoop()
+    }, STARTUP_GRACE_MS)
   })
 
   client.on('start_game', packet => {
