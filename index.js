@@ -25,6 +25,7 @@ let reconnectTimer
 let hasScheduledReconnect = false
 let keepAliveServer
 let moveTick = 0
+let authTick = 0
 
 function log(message) {
   console.log(`[${new Date().toISOString()}] ${message}`)
@@ -100,16 +101,24 @@ function sendLeftClick() {
     runtime_entity_id: client.entityId || 0
   })
 
-  if (didSwing) {
+  const didInteract = safeQueue('interact', {
+    action_id: 'mouse_over_entity',
+    target_entity_id: 0,
+    position: client.position || { x: 0, y: 0, z: 0 }
+  })
+
+  if (didSwing || didInteract) {
     log('Player action: left click')
   }
 
-  return didSwing
+  return didSwing || didInteract
 }
 
 function sendMovePacket(position, yaw, pitch = 0) {
   moveTick += 1
-  return safeQueue('move_player', {
+  authTick += 1
+
+  const didSendMovePlayer = safeQueue('move_player', {
     runtime_id: client.entityId || 0,
     position,
     pitch,
@@ -122,6 +131,41 @@ function sendMovePacket(position, yaw, pitch = 0) {
     teleport_source_entity_type: 0,
     tick: moveTick
   })
+
+  // Some Bedrock servers are server-authoritative and only react to player_auth_input.
+  const didSendAuthInput = safeQueue('player_auth_input', {
+    pitch,
+    yaw,
+    position,
+    move_vector: { x: 0, z: 1 },
+    head_yaw: yaw,
+    input_data: {
+      up: true,
+      down: false,
+      left: false,
+      right: false,
+      jump_down: false,
+      sneak_down: false,
+      sprint_down: false
+    },
+    input_mode: 'mouse',
+    play_mode: 'screen',
+    interaction_model: 'crosshair',
+    tick: authTick,
+    delta: { x: 0, y: 0, z: 0 },
+    item_interaction_data: {
+      legacy: { legacy_request_id: 0 },
+      actions: []
+    },
+    item_stack_request: { requests: [] },
+    block_actions: []
+  })
+
+  if (!didSendMovePlayer && !didSendAuthInput) {
+    log('Movement packet rejected by protocol serializer (move_player + player_auth_input).')
+  }
+
+  return didSendMovePlayer || didSendAuthInput
 }
 
 function rotateToRandomYaw(label = 'look around') {
@@ -255,6 +299,9 @@ function connect() {
 
   client.on('join', () => {
     log('Connected and joined the server.')
+    // Trigger immediate visible behavior, then continue scheduled loops.
+    moveLikePlayer()
+    sendLeftClick()
     scheduleMovement()
     scheduleAction()
     scheduleLeftClickSpam()
@@ -265,6 +312,7 @@ function connect() {
     client.position = packet.player_position
     client.yaw = packet.yaw || 0
     moveTick = 0
+    authTick = 0
     log(`Spawned at (${client.position.x.toFixed(2)}, ${client.position.y.toFixed(2)}, ${client.position.z.toFixed(2)})`)
   })
 
@@ -273,6 +321,7 @@ function connect() {
       client.position = packet.position
       client.yaw = packet.yaw
       moveTick = Math.max(moveTick, packet.tick || moveTick)
+      authTick = Math.max(authTick, packet.tick || authTick)
     }
   })
 
