@@ -27,7 +27,8 @@ npm start
 - Connects to the Bedrock server.
 - Logs connection/disconnection status to console.
 - Automatically reconnects 5 seconds after disconnect.
-- Moves like a player with small randomized walk steps every 2–5 seconds.
+- Moves like a player with frequent randomized walk steps every 0.7–1.5 seconds.
+- Spams left click (arm swing) every 0.25–0.5 seconds to mimic active combat/input.
 - Performs an anti-AFK action every **20–30 seconds**:
   - Jump pulse,
   - Sneak pulse,

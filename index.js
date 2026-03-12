@@ -9,18 +9,22 @@ const config = {
 
 const MIN_ACTION_DELAY_MS = 20_000
 const MAX_ACTION_DELAY_MS = 30_000
-const MIN_MOVE_DELAY_MS = 2_000
-const MAX_MOVE_DELAY_MS = 5_000
+const MIN_MOVE_DELAY_MS = 700
+const MAX_MOVE_DELAY_MS = 1_500
+const MIN_CLICK_DELAY_MS = 250
+const MAX_CLICK_DELAY_MS = 500
 const RECONNECT_DELAY_MS = 5_000
-const WALK_STEP_MIN = 0.25
-const WALK_STEP_MAX = 0.7
+const WALK_STEP_MIN = 0.35
+const WALK_STEP_MAX = 0.9
 
 let client
 let actionTimer
 let movementTimer
+let clickTimer
 let reconnectTimer
 let hasScheduledReconnect = false
 let keepAliveServer
+let moveTick = 0
 
 function log(message) {
   console.log(`[${new Date().toISOString()}] ${message}`)
@@ -45,6 +49,13 @@ function clearMovementLoop() {
   if (movementTimer) {
     clearTimeout(movementTimer)
     movementTimer = null
+  }
+}
+
+function clearClickLoop() {
+  if (clickTimer) {
+    clearTimeout(clickTimer)
+    clickTimer = null
   }
 }
 
@@ -83,7 +94,21 @@ function pulsePlayerAction(startAction, stopAction, label) {
   return true
 }
 
+function sendLeftClick() {
+  const didSwing = safeQueue('animate', {
+    action_id: 'swing_arm',
+    runtime_entity_id: client.entityId || 0
+  })
+
+  if (didSwing) {
+    log('Player action: left click')
+  }
+
+  return didSwing
+}
+
 function sendMovePacket(position, yaw, pitch = 0) {
+  moveTick += 1
   return safeQueue('move_player', {
     runtime_id: client.entityId || 0,
     position,
@@ -95,7 +120,7 @@ function sendMovePacket(position, yaw, pitch = 0) {
     ridden_runtime_id: 0,
     teleport_cause: 0,
     teleport_source_entity_type: 0,
-    tick: 0
+    tick: moveTick
   })
 }
 
@@ -116,7 +141,7 @@ function moveLikePlayer() {
   if (!client || !client.position) return false
 
   const currentYaw = Number.isFinite(client.yaw) ? client.yaw : getRandomFloat(0, 360)
-  const yawDelta = getRandomFloat(-55, 55)
+  const yawDelta = getRandomFloat(-40, 40)
   const yaw = (currentYaw + yawDelta + 360) % 360
   const radians = (yaw * Math.PI) / 180
   const step = getRandomFloat(WALK_STEP_MIN, WALK_STEP_MAX)
@@ -175,12 +200,26 @@ function scheduleMovement() {
 
     moveLikePlayer()
 
-    if (Math.random() < 0.2) {
+    if (Math.random() < 0.25) {
       rotateToRandomYaw('look around while walking')
     }
 
     scheduleMovement()
   }, getRandomInt(MIN_MOVE_DELAY_MS, MAX_MOVE_DELAY_MS))
+}
+
+function scheduleLeftClickSpam() {
+  clearClickLoop()
+
+  clickTimer = setTimeout(() => {
+    if (!client) {
+      scheduleLeftClickSpam()
+      return
+    }
+
+    sendLeftClick()
+    scheduleLeftClickSpam()
+  }, getRandomInt(MIN_CLICK_DELAY_MS, MAX_CLICK_DELAY_MS))
 }
 
 function scheduleReconnect(reason) {
@@ -189,6 +228,7 @@ function scheduleReconnect(reason) {
 
   clearActionLoop()
   clearMovementLoop()
+  clearClickLoop()
 
   log(`Disconnected (${reason}). Reconnecting in ${RECONNECT_DELAY_MS / 1000}s...`)
 
@@ -217,12 +257,14 @@ function connect() {
     log('Connected and joined the server.')
     scheduleMovement()
     scheduleAction()
+    scheduleLeftClickSpam()
   })
 
   client.on('start_game', packet => {
     client.entityId = packet.runtime_entity_id
     client.position = packet.player_position
     client.yaw = packet.yaw || 0
+    moveTick = 0
     log(`Spawned at (${client.position.x.toFixed(2)}, ${client.position.y.toFixed(2)}, ${client.position.z.toFixed(2)})`)
   })
 
@@ -230,6 +272,7 @@ function connect() {
     if (packet.runtime_id === client.entityId) {
       client.position = packet.position
       client.yaw = packet.yaw
+      moveTick = Math.max(moveTick, packet.tick || moveTick)
     }
   })
 
@@ -267,6 +310,7 @@ function shutdown() {
 
   clearActionLoop()
   clearMovementLoop()
+  clearClickLoop()
 
   if (reconnectTimer) {
     clearTimeout(reconnectTimer)
